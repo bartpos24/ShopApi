@@ -366,3 +366,4 @@ appsettings.json
 appsettings.development.json
 ShopApi/appsettings.Development.json
 /ShopApi/appsettings.json
+ShopApi/Migrations
