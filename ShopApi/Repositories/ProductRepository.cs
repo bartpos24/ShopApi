@@ -1,4 +1,6 @@
 ﻿using Dapper;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Data.SqlClient;
 using ShopApi.Extensions;
 using ShopApi.Interfaces.Repositories;
 using ShopApi.Models.Database;
@@ -24,11 +26,18 @@ namespace ShopApi.Repositories
 
             foreach(var product in listOfProduct)
             {
-                table.Rows.Add(product.Id, product.Barcode, product.Name, product.Brand, product.Capacity, product.Label);
+                table.Rows.Add(
+                    product.Id, 
+                    product.Barcode, 
+                    product.Name.Length > 500 ? product.Name.Substring(0, 500) : product.Name, 
+                    product.Brand.Length > 500 ? product.Brand.Substring(0, 500) : product.Brand, 
+                    product.Capacity.Length > 500 ? product.Capacity.Substring(0, 500) : product.Capacity, 
+                    product.Label.Length > 500 ? product.Label.Substring(0, 500) : product.Label
+                    );
             }
             var parameters = new DynamicParameters();
             parameters.Add("@Info", dbType: DbType.AnsiString, direction: ParameterDirection.InputOutput, size: 500);
-            parameters.AddDynamicParams(table);
+            parameters.Add("@Products", table.AsTableValuedParameter("InitProductTableType"));
             var result = await ExecuteStoredProcedure("InitializeProductFromCSV", parameters, transaction: transaction);
 
             return parameters.Get<string>("@Info");

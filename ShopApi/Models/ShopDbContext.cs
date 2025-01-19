@@ -15,5 +15,8 @@ namespace ShopApi.Models
         }
 
         public DbSet<InitProduct> InitProducts { get; set; }
+        public DbSet<Product> Products { get; set; }
+        public DbSet<Unit> Units { get; set; }
+        public DbSet<Barcode> Barcodes { get; set; }
     }
 }
