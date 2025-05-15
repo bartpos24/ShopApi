@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ShopApi.Interfaces.Repositories;
 using ShopApi.Models;
+using ShopApi.OpenFoodFactsAPI;
+using ShopApi.OpenFoodFactsAPI.Service;
 using ShopApi.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +17,8 @@ builder.Services.AddDbContext<ShopDbContext>(options => options.UseSqlServer(bui
 #region
 //Configuration Services
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddHttpClient<IOpenFoodFactsApiClient, OpenFoodFactsApiClient>();
+builder.Services.AddScoped<IOpenFoodFactsService, OpenFoodFactsService>();
 #endregion
 
 
