@@ -4,6 +4,10 @@ using ShopApi.Interfaces.Repositories;
 using ShopApi.Models.Database;
 using ShopApi.Models;
 using Microsoft.EntityFrameworkCore;
+using ShopApi.OpenFoodFactsAPI.Service;
+using ShopApi.OpenFoodFactsAPI;
+using ShopApi.OpenFoodFactsAPI.Model;
+using System.Text.Json;
 
 namespace ShopApi.Controllers
 {
@@ -12,10 +16,12 @@ namespace ShopApi.Controllers
     public class ProductController : ShopController
     {
         private IProductRepository ProductRepository { get; set; }
-        public ProductController(ShopDbContext context, ILogger<ProductController> logger, IProductRepository productRepository) : base(context, logger)
+		private readonly IOpenFoodFactsService openFoodFactsService;
+		public ProductController(ShopDbContext context, ILogger<ProductController> logger, IProductRepository productRepository, IOpenFoodFactsService _openFoodFactsService) : base(context, logger)
         {
             ProductRepository = productRepository;
-        }
+			openFoodFactsService = _openFoodFactsService;
+		}
 
         [HttpPost]
         [Route("[action]")]
@@ -32,12 +38,81 @@ namespace ShopApi.Controllers
 
             return Ok();
         }
-        [HttpGet]
+		[HttpGet]
+		[Route("[action]")]
+		public async Task TestApiDirectly()
+		{
+			using var client = new HttpClient();
+			client.DefaultRequestHeaders.UserAgent.ParseAdd("TestApp/1.0");
+			var response = await client.GetAsync("https://world.openfoodfacts.org/api/v0/product/5906340630011.json");
+			var content = await response.Content.ReadAsStringAsync();
+
+			try
+			{
+				var jsonOptions = new JsonSerializerOptions
+				{
+					PropertyNameCaseInsensitive = true,
+					PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+				};
+
+				var openFoodFactsResponse = JsonSerializer.Deserialize<OpenFoodFactsResponse>(content, jsonOptions);
+
+				var product = openFoodFactsResponse?.Product;
+
+			}
+			catch (JsonException ex)
+			{
+				Console.WriteLine($"JSON parsing error: {ex.Message}");
+				Console.WriteLine($"JSON parsing error: {ex.Message}");
+			}
+		}
+
+		[HttpGet]
+		[Route("[action]")]
+		public async Task<ActionResult> GetProductFromOpenFoodFacts([FromQuery] string barcode)
+		{
+			try
+			{
+				var product = await openFoodFactsService.GetProductByBarcodeAsync(barcode);
+
+				if (product == null)
+				{
+					return NotFound($"Product with barcode {barcode} not found in OpenFoodFacts database");
+				}
+
+				// Optionally save to local database
+				if (product.UnitId == 0)
+				{
+					var defaultUnit = await Context.Units.FirstOrDefaultAsync(u => u.Code == "szt");
+					if (defaultUnit != null)
+					{
+						product.UnitId = defaultUnit.Id;
+					}
+				}
+
+				Context.Products.Add(product);
+				await Context.SaveChangesAsync();
+
+				return Ok(product);
+			}
+			catch (ApiException ex)
+			{
+				Logger.LogError(ex, $"API error occurred while fetching product with barcode {barcode}");
+				return StatusCode(500, $"Error communicating with OpenFoodFacts API: {ex.Message}");
+			}
+			catch (Exception ex)
+			{
+				Logger.LogError(ex, $"Error occurred while processing product with barcode {barcode}");
+				return StatusCode(500, "An error occurred while processing your request");
+			}
+		}
+
+		[HttpGet]
         [Route("[action]")]
         public async Task<ActionResult> GetProductByBarcode([FromQuery] string barcode)
         {
-            var listOfProduct = Context.Barcodes.Where(b => b.Code == barcode).Select(b => b.Product).ToList();
-            if(listOfProduct.IsNullOrEmpty())
+            string listOfProduct = "";//var listOfProduct = Context.Barcodes.Where(b => b.Code == barcode).Select(b => b.Product).ToList();
+			if (listOfProduct.IsNullOrEmpty())
             {
                 var product = Context.InitProducts.FirstOrDefault(ip => ip.Barcode == barcode);
                 if(product == null) 
@@ -59,7 +134,7 @@ namespace ShopApi.Controllers
                     });
                     Context.Products.Add(productToAdd);
                     await Context.SaveChangesAsync();
-                    listOfProduct = Context.Barcodes.Where(b => b.Code == barcode).Select(b => b.Product).ToList();
+                    //listOfProduct = Context.Barcodes.Where(b => b.Code == barcode).Select(b => b.Product).ToList();
                     return listOfProduct.IsNullOrEmpty() ? NotFound("Nie znaleziono produktu z podanym kodem") : Ok(listOfProduct);
                 }
             } else
