@@ -22,6 +22,15 @@ builder.Services.AddHttpClient<IOpenFoodFactsApiClient, OpenFoodFactsApiClient>(
 builder.Services.AddScoped<IOpenFoodFactsService, OpenFoodFactsService>();
 #endregion
 
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 6;
+    options.Password.RequireLowercase = true;
+    options.SignIn.RequireConfirmedEmail = false;
+    options.User.RequireUniqueEmail = true;
+});
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
