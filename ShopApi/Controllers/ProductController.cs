@@ -8,6 +8,7 @@ using ShopApi.OpenFoodFactsAPI.Service;
 using ShopApi.OpenFoodFactsAPI;
 using ShopApi.OpenFoodFactsAPI.Model;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ShopApi.Controllers
 {
@@ -25,7 +26,8 @@ namespace ShopApi.Controllers
 
         [HttpPost]
         [Route("[action]")]
-        public async Task<ActionResult> InitProductFromCSV()
+		[Authorize(Roles = "ADM,USR")]
+		public async Task<ActionResult> InitProductFromCSV()
         {
             string filePath = @"F:\Bartek\Projekty\Inwentaryzacja\BarcodeDatabase\OpenFoodFacts\CSV\en.openfoodfacts.org.products.csv";
 
@@ -40,6 +42,7 @@ namespace ShopApi.Controllers
         }
 		[HttpGet]
 		[Route("[action]")]
+		[Authorize(Roles = "ADM,USR")]
 		public async Task TestApiDirectly()
 		{
 			using var client = new HttpClient();
@@ -69,7 +72,8 @@ namespace ShopApi.Controllers
 
 		[HttpGet]
 		[Route("[action]")]
-		public async Task<ActionResult> GetProductFromOpenFoodFacts([FromQuery] string barcode)
+		[Authorize(Roles = "ADM,USR")]
+		public async Task<ActionResult<Product>> GetProductFromOpenFoodFacts([FromQuery] string barcode)
 		{
 			try
 			{
@@ -109,12 +113,13 @@ namespace ShopApi.Controllers
 
 		[HttpGet]
         [Route("[action]")]
-        public async Task<ActionResult> GetProductByBarcode([FromQuery] string barcode)
+		[Authorize(Roles = "ADM,USR")]
+		public async Task<ActionResult> GetProductByBarcode([FromQuery] string barcode)
         {
             string listOfProduct = "";//var listOfProduct = Context.Barcodes.Where(b => b.Code == barcode).Select(b => b.Product).ToList();
 			if (listOfProduct.IsNullOrEmpty())
             {
-                var product = Context.InitProducts.FirstOrDefault(ip => ip.Barcode == barcode);
+                var product = await Context.InitProducts.FirstOrDefaultAsync(ip => ip.Barcode == barcode);
                 if(product == null) 
                     return NotFound("Nie znaleziono produktu z podanym kodem");
                 else
@@ -132,7 +137,7 @@ namespace ShopApi.Controllers
                     {
                         Code = product.Barcode
                     });
-                    Context.Products.Add(productToAdd);
+                    await Context.Products.AddAsync(productToAdd);
                     await Context.SaveChangesAsync();
                     //listOfProduct = Context.Barcodes.Where(b => b.Code == barcode).Select(b => b.Product).ToList();
                     return listOfProduct.IsNullOrEmpty() ? NotFound("Nie znaleziono produktu z podanym kodem") : Ok(listOfProduct);
@@ -142,7 +147,8 @@ namespace ShopApi.Controllers
         }
         [HttpPost]
         [Route("[action]")]
-        public async Task<ActionResult> AddProduct([FromBody] Product product)
+		[Authorize(Roles = "ADM,USR")]
+		public async Task<ActionResult> AddProduct([FromBody] Product product)
         {
             if(!product.IsGeneral)
             {
@@ -157,7 +163,8 @@ namespace ShopApi.Controllers
         }
         [HttpGet]
         [Route("[action]")]
-        public async Task<ActionResult> GetAllProducts()
+		[Authorize(Roles = "ADM,USR")]
+		public async Task<ActionResult> GetAllProducts()
         {
             var allProducts = await Context.Products.ToListAsync();
             return allProducts.IsNullOrEmpty() ? NotFound("Nie znaleziono produktów") : Ok(allProducts);

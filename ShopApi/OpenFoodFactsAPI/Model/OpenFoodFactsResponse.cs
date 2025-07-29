@@ -8,7 +8,15 @@ namespace ShopApi.OpenFoodFactsAPI.Model
 		public string Code { get; set; }
 
 		[JsonPropertyName("status")]
-		public int Status { get; set; }
+		public string StatusString { get; set; }
+		[JsonIgnore]
+		public int Status
+		{
+			get
+			{
+				return StatusString == "success" ? 1 : 0;
+			}
+		}
 
 		[JsonPropertyName("status_verbose")]
 		public string StatusVerbose { get; set; }

@@ -7,6 +7,11 @@ using ShopApi.Models;
 using ShopApi.OpenFoodFactsAPI;
 using ShopApi.OpenFoodFactsAPI.Service;
 using ShopApi.Repositories;
+using ShopApi.Models.Database;
+using ShopApi.Services;
+using ShopApi.Interfaces.Services;
+using Microsoft.OpenApi.Models;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +25,8 @@ builder.Services.AddDefaultIdentity<IdentityUser>().AddRoles<IdentityRole>().Add
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddHttpClient<IOpenFoodFactsApiClient, OpenFoodFactsApiClient>();
 builder.Services.AddScoped<IOpenFoodFactsService, OpenFoodFactsService>();
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 #endregion
 
 builder.Services.Configure<IdentityOptions>(options =>
@@ -42,15 +49,55 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:JWTAccessSecretKey"]))
+            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:JWTAccessSecretKey"])),
+			RoleClaimType = ClaimTypes.Role
         };
-    });
+		// Obs³uga zdarzeñ JWT
+		options.Events = new JwtBearerEvents
+		{
+			OnAuthenticationFailed = context =>
+			{
+				Console.WriteLine("Authentication failed: " + context.Exception.Message);
+				return Task.CompletedTask;
+			},
+			OnTokenValidated = context =>
+			{
+				Console.WriteLine("Token validated successfully");
+				return Task.CompletedTask;
+			}
+		};
+	});
 
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(config =>
+{
+	config.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+	{
+		Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+		Name = "Authorization",
+		In = ParameterLocation.Header,
+		Type = SecuritySchemeType.ApiKey,
+		Scheme = "Bearer"
+	});
+
+	config.AddSecurityRequirement(new OpenApiSecurityRequirement
+	{
+		{
+			new OpenApiSecurityScheme
+			{
+				Reference = new OpenApiReference
+				{
+					Type = ReferenceType.SecurityScheme,
+					Id = "Bearer"
+				}
+			},
+			new string[] {}
+		}
+	});
+});
 
 var app = builder.Build();
 
