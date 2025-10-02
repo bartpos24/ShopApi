@@ -2,8 +2,8 @@
 {
     public enum ELoginType
     {
-        Mobile = 1,
-        Web = 2,
-        External = 3,
+        Mobile,
+        Web,
+        External,
     }
 }

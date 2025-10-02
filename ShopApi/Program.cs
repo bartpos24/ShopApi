@@ -12,6 +12,7 @@ using ShopApi.Services;
 using ShopApi.Interfaces.Services;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,7 @@ var builder = WebApplication.CreateBuilder(args);
 //Database Connection
 builder.Services.AddDbContext<ShopDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("ShopDatabase")).EnableSensitiveDataLogging(true));
 builder.Services.AddDefaultIdentity<IdentityUser>().AddRoles<IdentityRole>().AddEntityFrameworkStores<ShopDbContext>();
+builder.Services.AddDbContext<TokenDbContext>(options => options.UseInMemoryDatabase("ShopApiTokenDb"));
 #region
 //Configuration Services
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
@@ -69,7 +71,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 	});
 
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+	options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+	options.JsonSerializerOptions.WriteIndented = false;
+	options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+	options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+});
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(config =>

@@ -45,18 +45,18 @@ namespace ShopApi.Services
 			return new TokenResponse
 			{
 				AccessToken = GenerateAccessToken(user, SSAID, roles),
-				RefreshToken = GenerateRefreshToken(user, SSAID, roles),
+				//RefreshToken = GenerateRefreshToken(user, SSAID, roles),
 				AccessTokenExpiry = DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:AccessTokenExpiryMinutes"])),
-				RefreshTokenExpiry = DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:RefreshTokenExpiryMinutes"])),
-				User = new UserInfo
-				{
-					Id = user.Id,
-					Name = user.Name,
-					Surname = user.Surname,
-					Username = user.Username,
-					Email = user.Email,
-					Roles = roles
-				}
+				//RefreshTokenExpiry = DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:RefreshTokenExpiryMinutes"])),
+				//User = new UserInfo
+				//{
+				//	Id = user.Id,
+				//	Name = user.Name,
+				//	Surname = user.Surname,
+				//	Username = user.Username,
+				//	Email = user.Email,
+				//	Roles = roles
+				//}
 			};
 		}
 		private string GenerateRefreshToken(User user, string SSAID, List<string> roles)

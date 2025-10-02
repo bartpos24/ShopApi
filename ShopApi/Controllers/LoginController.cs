@@ -7,38 +7,37 @@ using Microsoft.IdentityModel.Tokens;
 using ShopApi.Interfaces.Services;
 using ShopApi.Models;
 using ShopApi.Models.Database;
+using ShopApi.Models.Enums;
 using ShopApi.Models.TransferObject;
 using System.IdentityModel.Tokens.Jwt;
 
 namespace ShopApi.Controllers
 {
-    [Route("api/[controller]")]
-    [ApiController]
-    public class LoginController : ShopController
-    {
-        private readonly SignInManager<IdentityUser> signInManager;
-        private readonly UserManager<IdentityUser> userManager;
-        private readonly IConfiguration config;
-        private readonly IAuthService authService;
-		public LoginController(SignInManager<IdentityUser> _signInManager, UserManager<IdentityUser> _userManager, IAuthService _authService, IConfiguration _config, ShopDbContext context, ILogger<LoginController> logger) : base(context, logger)
-        {
-            //signInManager = _signInManager;
-            config = _config;
-            //userManager = _userManager;
+	[Route("api/[controller]")]
+	[ApiController]
+	public class LoginController : ShopController
+	{
+		private TokenDbContext TokenContext { get; }
+		private readonly IConfiguration config;
+		private readonly IAuthService authService;
+		public LoginController(IAuthService _authService, IConfiguration _config, TokenDbContext tokenDbContext, ShopDbContext context, ILogger<LoginController> logger) : base(context, logger)
+		{
+			TokenContext = tokenDbContext;
+			config = _config;
 			authService = _authService;
 		}
-        [AllowAnonymous]
-        [HttpPost]
+		[AllowAnonymous]
+		[HttpPost]
 		[Route("[action]")]
 		public async Task<ActionResult<TokenResponse>> Login([FromBody] LoginModel loginModel)
-        {
-            if(!ModelState.IsValid)
+		{
+			if (!ModelState.IsValid)
 			{
 				var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
 				return BadRequest($"Błędy walidacji: {errors}");
 			}
 
-			if(string.IsNullOrEmpty(loginModel.SSAID))
+			if (string.IsNullOrEmpty(loginModel.SSAID))
 				return BadRequest("SSAID jest wymagane w procesie logowania");
 
 			var user = await Context.Users
@@ -46,9 +45,9 @@ namespace ShopApi.Controllers
 				.ThenInclude(ru => ru.UserRole)
 				.FirstOrDefaultAsync(u => u.Username == loginModel.Username);
 
-			if(user == null)
+			if (user == null)
 				return NotFound($"Użytkownik o nazwie {loginModel.Username} nie istnieje");
-			if(!authService.VerifyPassword(user, loginModel.Passowrd))
+			if (!authService.VerifyPassword(user, loginModel.Password))
 				return Unauthorized("Nieprawidłowy login lub hasło");
 
 			var roles = user.RoleForUsers
@@ -56,26 +55,56 @@ namespace ShopApi.Controllers
 				.ToList();
 
 			var tokenResponse = authService.GenerateToken(user, loginModel.SSAID, roles);
+			var exisitingToken = await TokenContext.ShopApiTokens
+				.FirstOrDefaultAsync(shopApiToken => 
+					shopApiToken.Username == loginModel.Username && 
+					shopApiToken.LoginType == loginModel.LoginType && 
+					shopApiToken.LastActivity.IpAddress == HttpContext.Connection.RemoteIpAddress.ToString() && 
+					(shopApiToken.SSAID == loginModel.SSAID || loginModel.SSAID == null));
+			if(exisitingToken == null)
+			{
+				await TokenContext.ShopApiTokens.AddAsync(new ShopApiToken
+				{
+					//Guid = Guid.Parse(tokenResponse.AccessToken),
+					Username = loginModel.Username,
+					LoginType = loginModel.LoginType,
+					SSAID = loginModel.SSAID,
+					ExpirationDate = tokenResponse.AccessTokenExpiry,
+					Roles = string.Join(",", roles),
+					LastActivity = new UserActivity
+					{
+						IpAddress = HttpContext.Connection.RemoteIpAddress.ToString(),
+						LastActivity = DateTime.Now,
+						UserAgent = Request.Headers["User-Agent"]
+					}
+				});
+			} else
+			{
+				//exisitingToken.Guid = Guid.Parse(tokenResponse.AccessToken);
+				exisitingToken.ExpirationDate = tokenResponse.AccessTokenExpiry;
+			}
+			await TokenContext.SaveChangesAsync();
 			return Ok(tokenResponse);
+
 		}
 
 		[AllowAnonymous]
 		[HttpPost]
 		[Route("[action]")]
 		public async Task<IActionResult> Register([FromBody] RegisterModel userToRegister)
-        {
-            if(!ModelState.IsValid)
+		{
+			if (!ModelState.IsValid)
 			{
-                var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+				var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
 				return BadRequest($"Błędy walidacji: {errors}");
 			}
 			if (await Context.Users.AnyAsync(u => u.Username == userToRegister.Username))
 				return BadRequest($"Użytkownik o nazwie {userToRegister.Username} już istnieje");
-            if(await Context.Users.AnyAsync(u => u.Email == userToRegister.Email))
+			if (await Context.Users.AnyAsync(u => u.Email == userToRegister.Email))
 				return BadRequest($"Użytkownik o adresie email {userToRegister.Email} już istnieje");
 
-            var defaultRole = await Context.UserRoles
-				.FirstOrDefaultAsync(r => r.Code == "USR");
+			var defaultRole = await Context.UserRoles
+					.FirstOrDefaultAsync(r => r.Code == "USR");
 
 			var user = new User
 			{
@@ -83,19 +112,15 @@ namespace ShopApi.Controllers
 				Email = userToRegister.Email,
 				Name = userToRegister.Name,
 				Surname = userToRegister.Surname,
-                CreatedAt = DateTime.Now
+				CreatedAt = DateTime.Now
 			};
 
-            user.Passowrd = authService.HashPassword(user, userToRegister.Password);
-            Context.Add(user);
+			user.Passowrd = authService.HashPassword(user, userToRegister.Password);
+			Context.Add(user);
 			await Context.SaveChangesAsync();
 
-			if (user.Id > 0)
-			{
-                
-			}
 			if (user.Id > 0 && defaultRole != null && defaultRole.Id > 0)
-            {
+			{
 				var roleForUser = new RoleForUser
 				{
 					UserId = user.Id,
@@ -115,27 +140,22 @@ namespace ShopApi.Controllers
 			//         return BadRequest(result);
 
 			//var newUser = new IdentityUser { UserName = user.Username, Email = user.Email };
-   //         var result = await userManager.CreateAsync(newUser, user.Passowrd);
-            //if (result.Succeeded)
-            //    return Ok($"Pomyślnie dodano użytkownika {user.UserName}");
-            //else
-            //    return NotFound($"Wystąpił błąd dodawania użytkownika. {result.Errors.FirstOrDefault()}");
-        }
+			//         var result = await userManager.CreateAsync(newUser, user.Passowrd);
+			//if (result.Succeeded)
+			//    return Ok($"Pomyślnie dodano użytkownika {user.UserName}");
+			//else
+			//    return NotFound($"Wystąpił błąd dodawania użytkownika. {result.Errors.FirstOrDefault()}");
+		}
 
 		private string GenerateJsonWebToken(LoginModel loginModel)
-        {
-            var securityKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(config["Jwt:JWTAccessSecretKey"]));
-            var creadentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-            var token = new JwtSecurityToken(config["Jwt:Issuer"], config["Jwt:Audience"], null,
-                expires: DateTime.Now.AddMinutes(120),
-                signingCredentials: creadentials
-            );
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-        private bool AuthenticateUser(LoginModel loginModel)
-        {
-            var result = signInManager.PasswordSignInAsync(loginModel.Username, loginModel.Passowrd, true, lockoutOnFailure: false).Result;
-            return result.Succeeded;
-        }
-    }
+		{
+			var securityKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(config["Jwt:JWTAccessSecretKey"]));
+			var creadentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+			var token = new JwtSecurityToken(config["Jwt:Issuer"], config["Jwt:Audience"], null,
+					expires: DateTime.Now.AddMinutes(120),
+					signingCredentials: creadentials
+			);
+			return new JwtSecurityTokenHandler().WriteToken(token);
+		}
+	}
 }
