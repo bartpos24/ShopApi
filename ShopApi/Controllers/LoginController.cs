@@ -29,7 +29,7 @@ namespace ShopApi.Controllers
 		[AllowAnonymous]
 		[HttpPost]
 		[Route("[action]")]
-		public async Task<ActionResult<TokenResponse>> Login([FromBody] LoginModel loginModel)
+		public async Task<ActionResult<string>> Login([FromBody] LoginModel loginModel)
 		{
 			if (!ModelState.IsValid)
 			{
@@ -65,11 +65,11 @@ namespace ShopApi.Controllers
 			{
 				await TokenContext.ShopApiTokens.AddAsync(new ShopApiToken
 				{
-					//Guid = Guid.Parse(tokenResponse.AccessToken),
+					Guid = Guid.Parse(tokenResponse.Id),
 					Username = loginModel.Username,
 					LoginType = loginModel.LoginType,
 					SSAID = loginModel.SSAID,
-					ExpirationDate = tokenResponse.AccessTokenExpiry,
+					ExpirationDate = authService.GetTokenExpiry(),
 					Roles = string.Join(",", roles),
 					LastActivity = new UserActivity
 					{
@@ -81,11 +81,55 @@ namespace ShopApi.Controllers
 			} else
 			{
 				//exisitingToken.Guid = Guid.Parse(tokenResponse.AccessToken);
-				exisitingToken.ExpirationDate = tokenResponse.AccessTokenExpiry;
+				exisitingToken.ExpirationDate = authService.GetTokenExpiry();
 			}
 			await TokenContext.SaveChangesAsync();
-			return Ok(tokenResponse);
+			var tokenString = new JwtSecurityTokenHandler().WriteToken(tokenResponse);
+			return !string.IsNullOrEmpty(tokenString) ? Ok(tokenString) : NotFound("Wystąpił błąd podczas logowania użytkownika");
 
+		}
+
+		[AllowAnonymous]
+		[HttpPost]
+		[Route("[action]")]
+		public async Task<ActionResult<string>> Refresh([FromBody] string accessToken, [FromQuery] string? SSAID = null)
+		{
+			if (!authService.ValidateAccessToken(accessToken))
+				return BadRequest("Nieprawidłowy token dostępu");
+			var token = new JwtSecurityToken(accessToken);
+			if (!await TokenContext.ShopApiTokens.AnyAsync(validToken => validToken.Guid == Guid.Parse(token.Id)))
+				return BadRequest("Nieprawidłowy token dostępu");
+
+			var user = authService.GetUserFromToken(token);
+			if (user == null)
+				return NotFound();
+			var roles = user.RoleForUsers
+				.Select(ru => ru.UserRole.Code)
+				.ToList();
+
+			var newToken = authService.GenerateToken(user, SSAID, roles);
+
+			var oldToken = await TokenContext.ShopApiTokens
+				.FirstOrDefaultAsync(shopApiToken => shopApiToken.Guid == Guid.Parse(token.Id));
+			TokenContext.ShopApiTokens.Remove(oldToken);
+			await TokenContext.ShopApiTokens.AddAsync(new ShopApiToken
+			{
+				Guid = Guid.Parse(newToken.Id),
+				Username = user.Username,
+				LoginType = oldToken.LoginType,
+				SSAID = SSAID ?? oldToken.SSAID,
+				ExpirationDate = authService.GetTokenExpiry(),
+				Roles = string.Join(",", roles),
+				LastActivity = new UserActivity
+				{
+					IpAddress = HttpContext.Connection.RemoteIpAddress.ToString(),
+					LastActivity = DateTime.Now,
+					UserAgent = Request.Headers["User-Agent"]
+				}
+			});
+			await TokenContext.SaveChangesAsync();
+			var tokenString = new JwtSecurityTokenHandler().WriteToken(newToken);
+			return Ok(tokenString);
 		}
 
 		[AllowAnonymous]
@@ -145,6 +189,26 @@ namespace ShopApi.Controllers
 			//    return Ok($"Pomyślnie dodano użytkownika {user.UserName}");
 			//else
 			//    return NotFound($"Wystąpił błąd dodawania użytkownika. {result.Errors.FirstOrDefault()}");
+		}
+
+		[AllowAnonymous]
+		[HttpPost]
+		[Route("[action]")]
+		public async Task<IActionResult> Logout()
+		{
+			//var loginType = HttpContext.User.Claims
+			var token = await TokenContext.ShopApiTokens.FirstOrDefaultAsync(w => w.Username == HttpContext.User.Identity.Name);
+			if (token == null)
+			{
+				return NotFound();
+			}
+
+			var user = await Context.Users.FirstOrDefaultAsync(u => u.Username == token.Username);
+
+			//var loginLog = await Context.Sa
+			TokenContext.ShopApiTokens.Remove(token);
+			await TokenContext.SaveChangesAsync();
+			return Ok("Pomyślnie wylogowano użytkownika");
 		}
 
 		private string GenerateJsonWebToken(LoginModel loginModel)

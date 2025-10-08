@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using ShopApi.Interfaces.Services;
 using ShopApi.Models;
@@ -9,6 +11,7 @@ using System.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.Tasks;
 using static Dapper.SqlMapper;
 //using YourApp.Models;
 
@@ -40,24 +43,14 @@ namespace ShopApi.Services
 			var verificationResult = passwordHasher.VerifyHashedPassword(user, user.Passowrd, password);
 			return verificationResult == PasswordVerificationResult.Success;
 		}
-		public TokenResponse GenerateToken(User user, string SSAID, List<string> roles)
+		public JwtSecurityToken GenerateToken(User user, string SSAID, List<string> roles)
 		{
-			return new TokenResponse
-			{
-				AccessToken = GenerateAccessToken(user, SSAID, roles),
-				//RefreshToken = GenerateRefreshToken(user, SSAID, roles),
-				AccessTokenExpiry = DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:AccessTokenExpiryMinutes"])),
-				//RefreshTokenExpiry = DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:RefreshTokenExpiryMinutes"])),
-				//User = new UserInfo
-				//{
-				//	Id = user.Id,
-				//	Name = user.Name,
-				//	Surname = user.Surname,
-				//	Username = user.Username,
-				//	Email = user.Email,
-				//	Roles = roles
-				//}
-			};
+			return GenerateAccessToken(user, SSAID, roles);
+		}
+
+		public DateTime GetTokenExpiry()
+		{
+			return DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:AccessTokenExpiryMinutes"]));
 		}
 		private string GenerateRefreshToken(User user, string SSAID, List<string> roles)
 		{
@@ -98,7 +91,7 @@ namespace ShopApi.Services
 			);
 			return new JwtSecurityTokenHandler().WriteToken(token);
 		}
-		private string GenerateAccessToken(User user, string SSAID, List<string> roles)
+		private JwtSecurityToken GenerateAccessToken(User user, string SSAID, List<string> roles)
 		{
 			var claims = new List<Claim>
 			{
@@ -135,7 +128,55 @@ namespace ShopApi.Services
 				expires: DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:AccessTokenExpiryMinutes"])),
 				signingCredentials: credentials
 			);
-			return new JwtSecurityTokenHandler().WriteToken(token);
+			//return new JwtSecurityTokenHandler().WriteToken(token);
+			return token;
+		}
+
+		public bool ValidateAccessToken(string token)
+		{
+			var tokenHandler = new JwtSecurityTokenHandler();
+			var key = Encoding.UTF8.GetBytes(configuration["Jwt:JWTAccessSecretKey"]);
+			try
+			{
+				tokenHandler.ValidateToken(token, new TokenValidationParameters
+				{
+					ValidateIssuerSigningKey = true,
+					IssuerSigningKey = new SymmetricSecurityKey(key),
+					ValidateIssuer = true,
+					ValidIssuer = configuration["Jwt:Issuer"],
+					ValidateAudience = true,
+					ValidAudience = configuration["Jwt:Audience"],
+					//ClockSkew = TimeSpan.Zero // Eliminuje domyślny czas tolerancji 5 minut
+				}, out SecurityToken validatedToken);
+				return true; // Token jest ważny
+			}
+			catch (SecurityTokenValidationException validationException)
+			{
+				logger.LogInformation($"Token is not Valid: {validationException.Message}");
+				return false;
+			}
+			catch (ArgumentException argException)
+			{
+				logger.LogInformation($"Wrong format: {argException.Message}");
+				return false;
+			}
+			catch
+			{
+				return false; // Token jest nieważny
+			}
+		}
+		public User? GetUserFromToken(JwtSecurityToken token)
+		{
+			int.TryParse(token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value, out var userId);
+			var username = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
+			var email = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+			var name = token.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
+			var surname = token.Claims.FirstOrDefault(c => c.Type == "surname")?.Value;
+
+			return context.Users
+				.Include(u => u.RoleForUsers)
+				.ThenInclude(ru => ru.UserRole)
+				.FirstOrDefault(u => u.Id == userId && u.Username == username && u.Email == email && u.Name == name && u.Surname == surname);
 		}
 		//public async Task<IActionResult> RegisterUser(RegisterModel userToRegister)
 		//{

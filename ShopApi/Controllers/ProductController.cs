@@ -94,8 +94,9 @@ namespace ShopApi.Controllers
 					}
 				}
 
-				Context.Products.Add(product);
-				await Context.SaveChangesAsync();
+				//if(await Context.Barcodes.Any(b => product.Barcodes.Contains(pb => pb.)))
+				//Context.Products.Add(product);
+				//await Context.SaveChangesAsync();
 
 				return Ok(product);
 			}
@@ -114,9 +115,10 @@ namespace ShopApi.Controllers
 		[HttpGet]
 		[Route("[action]")]
 		[Authorize(Roles = "ADM,USR")]
-		public async Task<ActionResult> GetProductByBarcode([FromQuery] string barcode)
+		public async Task<ActionResult<List<Product>>> GetProductByBarcode([FromQuery] string barcode)
 		{
-			string listOfProduct = "";//var listOfProduct = Context.Barcodes.Where(b => b.Code == barcode).Select(b => b.Product).ToList();
+			var productIds = await Context.Barcodes.Where(b => b.Code == barcode).Select(b => b.ProductId).ToListAsync();
+			var listOfProduct = await Context.Products.Where(p => productIds.Contains(p.Id)).Include(u => u.Unit).Include(b => b.Barcodes).ToListAsync();
 			if (listOfProduct.IsNullOrEmpty())
 			{
 				var product = await Context.InitProducts.FirstOrDefaultAsync(ip => ip.Barcode == barcode);
@@ -133,13 +135,16 @@ namespace ShopApi.Controllers
 						IsGeneral = false,
 						UnitId = Context.Units.FirstOrDefault(w => w.Code == "szt").Id
 					};
-					productToAdd.Barcodes.Add(new Barcode()
-					{
-						Code = product.Barcode
-					});
 					await Context.Products.AddAsync(productToAdd);
 					await Context.SaveChangesAsync();
-					//listOfProduct = Context.Barcodes.Where(b => b.Code == barcode).Select(b => b.Product).ToList();
+					var productBarcode = new Barcode
+					{
+						Code = product.Barcode,
+						ProductId = productToAdd.Id
+					};
+					await Context.Barcodes.AddAsync(productBarcode);
+					await Context.SaveChangesAsync();
+					listOfProduct.Add(await Context.Products.Include(u => u.Unit).Include(b => b.Barcodes).FirstOrDefaultAsync(w => w.Id == productToAdd.Id));
 					return listOfProduct.IsNullOrEmpty() ? NotFound("Nie znaleziono produktu z podanym kodem") : Ok(listOfProduct);
 				}
 			}
