@@ -17,8 +17,11 @@ namespace ShopApi.Models
 		public virtual DbSet<User> Users { get; set; }
 		public DbSet<UserRole> UserRoles { get; set; }
 		public DbSet<RoleForUser> RoleForUser { get; set; }  
+		public DbSet<InventoryStatus> InventoryStatus { get; set; }
+		public DbSet<Inventory> Inventories { get; set; }
+        public DbSet<InventoryPosition> InventoryPositions { get; set; }
 
-		protected override void OnModelCreating(ModelBuilder builder)
+        protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
 
@@ -34,6 +37,24 @@ namespace ShopApi.Models
 				.HasOne(r => r.UserRole)
 				.WithMany(ur => ur.RoleForUsers)
 				.HasForeignKey(r => r.UserRoleId);
-		}
+
+            builder.Entity<InventoryPosition>()
+                .HasOne(ip => ip.User)
+                .WithMany()
+                .HasForeignKey(ip => ip.UserId)
+                .OnDelete(DeleteBehavior.Restrict); // Change from Cascade to Restrict
+
+            builder.Entity<InventoryPosition>()
+                .HasOne(ip => ip.ModifiedByUser)
+                .WithMany()
+                .HasForeignKey(ip => ip.ModifiedByUserId)
+                .OnDelete(DeleteBehavior.Restrict); // Keep as Restrict/NoAction
+
+            builder.Entity<Inventory>()
+                .HasOne(i => i.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(i => i.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict); // Change from Cascade to Restrict
+        }
 	}
 }

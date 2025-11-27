@@ -12,6 +12,7 @@
         public int UnitId { get; set; }
         public virtual Unit Unit { get; set; }
         public virtual ICollection<Barcode> Barcodes { get; set; }
-        
+        public virtual ICollection<InventoryPosition> InventoryPositions { get; set; }
+
     }
 }
