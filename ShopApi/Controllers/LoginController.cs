@@ -37,7 +37,7 @@ namespace ShopApi.Controllers
 				return BadRequest($"Błędy walidacji: {errors}");
 			}
 
-			if (string.IsNullOrEmpty(loginModel.SSAID))
+			if (loginModel.LoginType == ELoginType.Mobile && string.IsNullOrEmpty(loginModel.SSAID))
 				return BadRequest("SSAID jest wymagane w procesie logowania");
 
 			var user = await Context.Users
