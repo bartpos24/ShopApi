@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using ShopApi.Interfaces.Services;
 using ShopApi.Models;
 using ShopApi.Models.Database;
+using ShopApi.Models.Enums;
 using ShopApi.Models.TransferObject;
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
@@ -13,7 +14,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using static Dapper.SqlMapper;
-//using YourApp.Models;
+using static ShopApi.Extensions.ClaimsPrincipalExtensions;
 
 namespace ShopApi.Services
 {
@@ -43,16 +44,16 @@ namespace ShopApi.Services
 			var verificationResult = passwordHasher.VerifyHashedPassword(user, user.Passowrd, password);
 			return verificationResult == PasswordVerificationResult.Success;
 		}
-		public JwtSecurityToken GenerateToken(User user, string SSAID, List<string> roles)
+		public JwtSecurityToken GenerateToken(User user, string SSAID, List<string> roles, ELoginType loginType)
 		{
-			return GenerateAccessToken(user, SSAID, roles);
+			return GenerateAccessToken(user, SSAID, roles, loginType);
 		}
 
 		public DateTime GetTokenExpiry()
 		{
 			return DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:AccessTokenExpiryMinutes"]));
 		}
-		private string GenerateRefreshToken(User user, string SSAID, List<string> roles)
+		private string GenerateRefreshToken(User user, string SSAID, List<string> roles, ELoginType loginType)
 		{
 			var claims = new List<Claim>
 			{
@@ -91,17 +92,18 @@ namespace ShopApi.Services
 			);
 			return new JwtSecurityTokenHandler().WriteToken(token);
 		}
-		private JwtSecurityToken GenerateAccessToken(User user, string SSAID, List<string> roles)
+		private JwtSecurityToken GenerateAccessToken(User user, string SSAID, List<string> roles, ELoginType loginType)
 		{
 			var claims = new List<Claim>
 			{
-				new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-				new Claim(ClaimTypes.Name, user.Username),
-				new Claim(ClaimTypes.Email, user.Email),
-				new Claim("name", user.Name),
-				new Claim("surname", user.Surname),
 				new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()), // Unikalny identyfikator tokenu
-                new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+				new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
+				new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+				new Claim(ClaimTypes.Name, user.Name),
+				new Claim(ClaimTypes.Surname, user.Surname),
+				new Claim(ClaimTypes.Email, user.Email),
+				new Claim(ShopLoginClaimsKey, loginType.ToString()),
+				new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
 			};
 
 			// Dodanie ról jako osobnych claimów

@@ -1,16 +1,18 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using ShopApi.Interfaces.Repositories;
+using ShopApi.Interfaces.Services;
 using ShopApi.Models;
+using ShopApi.Models.Database;
 using ShopApi.OpenFoodFactsAPI;
 using ShopApi.OpenFoodFactsAPI.Service;
 using ShopApi.Repositories;
-using ShopApi.Models.Database;
+using ShopApi.Security;
+using ShopApi.Security.Licensing;
 using ShopApi.Services;
-using ShopApi.Interfaces.Services;
-using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 
@@ -20,7 +22,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 //Database Connection
 builder.Services.AddDbContext<ShopDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("ShopDatabase")).EnableSensitiveDataLogging(true));
-builder.Services.AddDefaultIdentity<IdentityUser>().AddRoles<IdentityRole>().AddEntityFrameworkStores<ShopDbContext>();
+//builder.Services.AddDefaultIdentity<IdentityUser>().AddRoles<IdentityRole>().AddEntityFrameworkStores<ShopDbContext>();
 builder.Services.AddDbContext<TokenDbContext>(options => options.UseInMemoryDatabase("ShopApiTokenDb"));
 #region
 //Configuration Services
@@ -54,22 +56,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:JWTAccessSecretKey"])),
 			RoleClaimType = ClaimTypes.Role
         };
+		options.EventsType = typeof(TokenEvents);
 		// Obs³uga zdarzeñ JWT
-		options.Events = new JwtBearerEvents
-		{
-			OnAuthenticationFailed = context =>
-			{
-				Console.WriteLine("Authentication failed: " + context.Exception.Message);
-				return Task.CompletedTask;
-			},
-			OnTokenValidated = context =>
-			{
-				Console.WriteLine("Token validated successfully");
-				return Task.CompletedTask;
-			}
-		};
+		//options.Events = new JwtBearerEvents
+		//{
+		//	OnAuthenticationFailed = context =>
+		//	{
+		//		Console.WriteLine("Authentication failed: " + context.Exception.Message);
+		//		return Task.CompletedTask;
+		//	},
+		//	OnTokenValidated = context =>
+		//	{
+		//		Console.WriteLine("Token validated successfully");
+		//		return Task.CompletedTask;
+		//	}
+		//};
 	});
+builder.Services.AddSingleton<IAuditActivityChannel, AuditActivityChannel>();
+//builder.Services.AddHostedService<AuditActivityBackgroundService>();
 
+builder.Services.AddScoped<ILicenseManager, LicenseManager>();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {

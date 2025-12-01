@@ -54,7 +54,7 @@ namespace ShopApi.Models
 						.IsRequired()
 						.HasConversion(new EnumToStringConverter<ELoginType>())
 						.HasMaxLength(20)
-						.HasColumnName("LicenseType");
+						.HasColumnName("LoginType");
 
 				entity.OwnsOne<UserActivity>(e => e.LastActivity, o =>
 				{

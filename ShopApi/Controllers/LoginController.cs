@@ -9,6 +9,8 @@ using ShopApi.Models;
 using ShopApi.Models.Database;
 using ShopApi.Models.Enums;
 using ShopApi.Models.TransferObject;
+using ShopApi.Security.Licensing;
+using System.ComponentModel;
 using System.IdentityModel.Tokens.Jwt;
 
 namespace ShopApi.Controllers
@@ -20,11 +22,13 @@ namespace ShopApi.Controllers
 		private TokenDbContext TokenContext { get; }
 		private readonly IConfiguration config;
 		private readonly IAuthService authService;
-		public LoginController(IAuthService _authService, IConfiguration _config, TokenDbContext tokenDbContext, ShopDbContext context, ILogger<LoginController> logger) : base(context, logger)
+		private ILicenseManager LicenseManager { get; }
+		public LoginController(IAuthService _authService, IConfiguration _config, TokenDbContext tokenDbContext, ShopDbContext context, ILogger<LoginController> logger, ILicenseManager licenseManager) : base(context, logger)
 		{
 			TokenContext = tokenDbContext;
 			config = _config;
 			authService = _authService;
+			LicenseManager = licenseManager;
 		}
 		[AllowAnonymous]
 		[HttpPost]
@@ -53,6 +57,12 @@ namespace ShopApi.Controllers
 			var roles = user.RoleForUsers
 				.Select(ru => ru.UserRole.Code)
 				.ToList();
+
+			try { await LicenseManager.TryLogin(user.Username, HttpContext.Connection.RemoteIpAddress.ToString(), loginModel.LoginType, loginModel.SSAID); }
+			catch (Exception ex)
+			{
+				return BadRequest(ex.Message); //returns specific message to show on Android from LicenseManager.TryLogin method
+			}
 
 			var tokenResponse = authService.GenerateToken(user, loginModel.SSAID, roles);
 			var exisitingToken = await TokenContext.ShopApiTokens
