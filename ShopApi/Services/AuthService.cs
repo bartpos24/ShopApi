@@ -8,6 +8,7 @@ using ShopApi.Models;
 using ShopApi.Models.Database;
 using ShopApi.Models.Enums;
 using ShopApi.Models.TransferObject;
+using ShopApi.Utilities;
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -21,17 +22,16 @@ namespace ShopApi.Services
 	public class AuthService : IAuthService
 	{
 		private readonly ShopDbContext context;
-		//private readonly IJwtService jwtService;
+		private IServiceProvider ServiceProvider { get; }
+		private TokenSettings Settings => ServiceProvider.GetSettings<TokenSettings>();
 		private readonly ILogger<AuthService> logger;
 		private readonly IPasswordHasher<User> passwordHasher;
-		private readonly IConfiguration configuration;
-		public AuthService(ShopDbContext _context, ILogger<AuthService> _logger, IPasswordHasher<User> _passwordHasher, IConfiguration _configuration)
+		public AuthService(ShopDbContext _context, ILogger<AuthService> _logger, IPasswordHasher<User> _passwordHasher, IConfiguration _configuration, IServiceProvider serviceProvider)
 		{
 			context = _context;
-			//jwtService = _jwtService;
 			logger = _logger;
 			passwordHasher = _passwordHasher;
-			configuration = _configuration;
+			ServiceProvider = serviceProvider;
 		}
 		public string HashPassword(User user, string password)
 		{
@@ -51,7 +51,7 @@ namespace ShopApi.Services
 
 		public DateTime GetTokenExpiry()
 		{
-			return DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:AccessTokenExpiryMinutes"]));
+			return DateTime.UtcNow.AddMinutes(Settings.AccessTokenExpiryMinutes);
 		}
 		private string GenerateRefreshToken(User user, string SSAID, List<string> roles, ELoginType loginType)
 		{
@@ -79,15 +79,15 @@ namespace ShopApi.Services
 			}
 
 			// Klucz symetryczny do podpisania tokenu
-			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:JWTRefreshSecretKey"]));
+			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Settings.JWTAccessSecretKey));
 			var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
 			// Utworzenie tokenu
 			var token = new JwtSecurityToken(
-				issuer: configuration["Jwt:Issuer"],
-				audience: configuration["Jwt:Audience"],
+				issuer: Settings.Issuer,
+				audience: Settings.Audience,
 				claims: claims,
-				expires: DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:RefreshTokenExpiryMinutes"])),
+				expires: DateTime.UtcNow.AddMinutes(Settings.RefreshTokenExpiryMinutes),
 				signingCredentials: credentials
 			);
 			return new JwtSecurityTokenHandler().WriteToken(token);
@@ -119,15 +119,15 @@ namespace ShopApi.Services
 			}
 
 			// Klucz symetryczny do podpisania tokenu
-			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:JWTAccessSecretKey"]));
+			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Settings.JWTAccessSecretKey));
 			var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
 			// Utworzenie tokenu
 			var token = new JwtSecurityToken(
-				issuer: configuration["Jwt:Issuer"],
-				audience: configuration["Jwt:Audience"],
+				issuer: Settings.Issuer,
+				audience: Settings.Audience,
 				claims: claims,
-				expires: DateTime.UtcNow.AddMinutes(int.Parse(configuration["Jwt:AccessTokenExpiryMinutes"])),
+				expires: DateTime.UtcNow.AddMinutes(Settings.AccessTokenExpiryMinutes),
 				signingCredentials: credentials
 			);
 			//return new JwtSecurityTokenHandler().WriteToken(token);
@@ -137,7 +137,7 @@ namespace ShopApi.Services
 		public bool ValidateAccessToken(string token)
 		{
 			var tokenHandler = new JwtSecurityTokenHandler();
-			var key = Encoding.UTF8.GetBytes(configuration["Jwt:JWTAccessSecretKey"]);
+			var key = Encoding.UTF8.GetBytes(Settings.JWTAccessSecretKey);
 			try
 			{
 				tokenHandler.ValidateToken(token, new TokenValidationParameters
@@ -145,9 +145,9 @@ namespace ShopApi.Services
 					ValidateIssuerSigningKey = true,
 					IssuerSigningKey = new SymmetricSecurityKey(key),
 					ValidateIssuer = true,
-					ValidIssuer = configuration["Jwt:Issuer"],
+					ValidIssuer = Settings.Issuer,
 					ValidateAudience = true,
-					ValidAudience = configuration["Jwt:Audience"],
+					ValidAudience = Settings.Audience,
 					//ClockSkew = TimeSpan.Zero // Eliminuje domyślny czas tolerancji 5 minut
 				}, out SecurityToken validatedToken);
 				return true; // Token jest ważny
@@ -169,16 +169,22 @@ namespace ShopApi.Services
 		}
 		public User? GetUserFromToken(JwtSecurityToken token)
 		{
-			int.TryParse(token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value, out var userId);
-			var username = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
+			int.TryParse(token.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value, out var userId);
+			var username = token.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.UniqueName)?.Value;
 			var email = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
-			var name = token.Claims.FirstOrDefault(c => c.Type == "name")?.Value;
-			var surname = token.Claims.FirstOrDefault(c => c.Type == "surname")?.Value;
+			var name = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value;
+			var surname = token.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Surname)?.Value;
 
 			return context.Users
 				.Include(u => u.RoleForUsers)
 				.ThenInclude(ru => ru.UserRole)
 				.FirstOrDefault(u => u.Id == userId && u.Username == username && u.Email == email && u.Name == name && u.Surname == surname);
+		}
+
+		public ELoginType GetLoginTypeFromToken(JwtSecurityToken token)
+		{
+			Enum.TryParse(token.Claims.FirstOrDefault(c => c.Type == ShopLoginClaimsKey)?.Value, out ELoginType loginType);
+			return loginType;
 		}
 		//public async Task<IActionResult> RegisterUser(RegisterModel userToRegister)
 		//{

@@ -1,6 +1,6 @@
 ﻿using ShopApi.Models.Enums;
 
-namespace ShopApi.Services
+namespace ShopApi.Services.Background
 {
 	public interface IAuditActivityChannel
 	{

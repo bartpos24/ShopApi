@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using ShopApi.Models;
+using ShopApi.Models.Database;
 using ShopApi.Models.Enums;
 
 namespace ShopApi.Security.Licensing
@@ -15,24 +16,18 @@ namespace ShopApi.Security.Licensing
 			TokenDbContext = tokenDbContext;
 			ShopDbContext = dbContext;
 		}
-		public async Task TryLogin(string userDbName, string IpAddres, ELoginType loginType, string ssaid = null)
+		public async Task TryLogin(User user, string IpAddres, ELoginType loginType, string ssaid = null)
 		{
-			var user = await ShopDbContext.Users.Where(u => u.Username == userDbName)
-				.Include(u => u.RoleForUsers)
-				.ThenInclude(ru => ru.UserRole)
-				.FirstOrDefaultAsync();
-
 			if (user.RoleForUsers.Any(s => s.UserRole.Code == "ADM")) return; //ignore licenses for admin roles.
-
 
 			if (loginType != ELoginType.Mobile || loginType != ELoginType.Web) // License validation for PC/External system ends here
 				return;
 
 			var devicesLoggedIn = await GetLoggedInDevices(loginType, ssaid);
 
-			if (devicesLoggedIn.Any(d => d.Username == userDbName)) //log out the same user on different device
+			if (devicesLoggedIn.Any(d => d.Username == user.Username)) //log out the same user on different device
 			{
-				var sameUserOnDiffDevice = devicesLoggedIn.FirstOrDefault(d => d.Username == userDbName);
+				var sameUserOnDiffDevice = devicesLoggedIn.FirstOrDefault(d => d.Username == user.Username);
 				TokenDbContext.ShopApiTokens.Remove(sameUserOnDiffDevice);
 				await TokenDbContext.SaveChangesAsync();
 

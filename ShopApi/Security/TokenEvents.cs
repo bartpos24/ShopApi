@@ -2,7 +2,7 @@
 using ShopApi.Extensions;
 using ShopApi.Models;
 using ShopApi.Models.Enums;
-using ShopApi.Services;
+using ShopApi.Services.Background;
 using System.Security.Claims;
 using System.Threading.Channels;
 
@@ -12,9 +12,10 @@ namespace ShopApi.Security
 	{
 		private ILogger<TokenEvents> Logger { get; }
 		private IAuditActivityChannel Channel { get; }
-		public TokenEvents(ILogger<TokenEvents> logger, TokenDbContext tokenContext)
+		public TokenEvents(ILogger<TokenEvents> logger, TokenDbContext tokenContext, IAuditActivityChannel channel)
 		{
 			Logger = logger;
+			Channel = channel;
 			base.OnTokenValidated = OnTokenValidated;
 		}
 		private new async Task OnTokenValidated(TokenValidatedContext context)

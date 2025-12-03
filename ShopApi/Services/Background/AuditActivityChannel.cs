@@ -5,7 +5,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace ShopApi.Services
+namespace ShopApi.Services.Background
 {
 	public class AuditActivityChannel : IAuditActivityChannel
 	{

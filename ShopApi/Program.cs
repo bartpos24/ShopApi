@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using ShopApi.Interfaces.Repositories;
@@ -13,6 +14,8 @@ using ShopApi.Repositories;
 using ShopApi.Security;
 using ShopApi.Security.Licensing;
 using ShopApi.Services;
+using ShopApi.Services.Background;
+using ShopApi.Utilities;
 using System.Security.Claims;
 using System.Text.Json.Serialization;
 
@@ -24,6 +27,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ShopDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("ShopDatabase")).EnableSensitiveDataLogging(true));
 //builder.Services.AddDefaultIdentity<IdentityUser>().AddRoles<IdentityRole>().AddEntityFrameworkStores<ShopDbContext>();
 builder.Services.AddDbContext<TokenDbContext>(options => options.UseInMemoryDatabase("ShopApiTokenDb"));
+
+builder.Services.Configure<TokenSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<TokenExpirationBackgroundServiceSettings>(builder.Configuration.GetSection("BackgroundServices:TokenExpirationBackgroundService"));
+builder.Services.AddScoped<TokenEvents>();
+builder.Services.AddSingleton<IAuditActivityChannel, AuditActivityChannel>();
+builder.Services.AddHostedService<TokenExpirationBackgroundService>();
+builder.Services.AddHostedService<AuditActivityBackgroundService>();
+builder.Services.AddScoped<ILicenseManager, LicenseManager>();
 #region
 //Configuration Services
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
@@ -45,15 +56,17 @@ builder.Services.Configure<IdentityOptions>(options =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-       options.TokenValidationParameters = new TokenValidationParameters
+		var tokenSettings = builder.Configuration.GetConfig<TokenSettings>("Jwt");
+		options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration["Jwt:JWTAccessSecretKey"])),
+            ValidIssuer = tokenSettings.Issuer,
+            ValidAudience = tokenSettings.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(tokenSettings.JWTAccessSecretKey)),
+			ClockSkew = TimeSpan.FromSeconds(tokenSettings.ClockSkewSeconds),
 			RoleClaimType = ClaimTypes.Role
         };
 		options.EventsType = typeof(TokenEvents);
@@ -72,10 +85,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 		//	}
 		//};
 	});
-builder.Services.AddSingleton<IAuditActivityChannel, AuditActivityChannel>();
-//builder.Services.AddHostedService<AuditActivityBackgroundService>();
-
-builder.Services.AddScoped<ILicenseManager, LicenseManager>();
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {

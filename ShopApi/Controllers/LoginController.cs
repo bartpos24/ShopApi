@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using ShopApi.Extensions;
 using ShopApi.Interfaces.Services;
 using ShopApi.Models;
 using ShopApi.Models.Database;
@@ -58,13 +59,13 @@ namespace ShopApi.Controllers
 				.Select(ru => ru.UserRole.Code)
 				.ToList();
 
-			try { await LicenseManager.TryLogin(user.Username, HttpContext.Connection.RemoteIpAddress.ToString(), loginModel.LoginType, loginModel.SSAID); }
+			try { await LicenseManager.TryLogin(user, HttpContext.Connection.RemoteIpAddress.ToString(), loginModel.LoginType, loginModel.SSAID); }
 			catch (Exception ex)
 			{
 				return BadRequest(ex.Message); //returns specific message to show on Android from LicenseManager.TryLogin method
 			}
 
-			var tokenResponse = authService.GenerateToken(user, loginModel.SSAID, roles);
+			var tokenResponse = authService.GenerateToken(user, loginModel.SSAID, roles, loginModel.LoginType);
 			var exisitingToken = await TokenContext.ShopApiTokens
 				.FirstOrDefaultAsync(shopApiToken => 
 					shopApiToken.Username == loginModel.Username && 
@@ -111,13 +112,19 @@ namespace ShopApi.Controllers
 				return BadRequest("Nieprawidłowy token dostępu");
 
 			var user = authService.GetUserFromToken(token);
+			var loginType = authService.GetLoginTypeFromToken(token);
 			if (user == null)
 				return NotFound();
 			var roles = user.RoleForUsers
 				.Select(ru => ru.UserRole.Code)
 				.ToList();
 
-			var newToken = authService.GenerateToken(user, SSAID, roles);
+			try { await LicenseManager.TryLogin(user, HttpContext.Connection.RemoteIpAddress.ToString(), loginType, SSAID); }
+			catch (Exception ex)
+			{
+				return BadRequest(ex.Message); //Show specific message for android
+			}
+			var newToken = authService.GenerateToken(user, SSAID, roles, loginType);
 
 			var oldToken = await TokenContext.ShopApiTokens
 				.FirstOrDefaultAsync(shopApiToken => shopApiToken.Guid == Guid.Parse(token.Id));
@@ -206,8 +213,12 @@ namespace ShopApi.Controllers
 		[Route("[action]")]
 		public async Task<IActionResult> Logout()
 		{
-			//var loginType = HttpContext.User.Claims
-			var token = await TokenContext.ShopApiTokens.FirstOrDefaultAsync(w => w.Username == HttpContext.User.Identity.Name);
+			var loginType = HttpContext.User.ShopLoginType();
+			if (loginType == null)
+			{
+				return NotFound();
+			}
+			var token = await TokenContext.ShopApiTokens.FirstOrDefaultAsync(w => w.Username == HttpContext.User.Identity.Name && w.LoginType == loginType);
 			if (token == null)
 			{
 				return NotFound();

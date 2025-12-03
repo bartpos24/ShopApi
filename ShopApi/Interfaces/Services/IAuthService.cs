@@ -14,5 +14,6 @@ namespace ShopApi.Interfaces.Services
 		DateTime GetTokenExpiry();
 		bool ValidateAccessToken(string token);
 		User? GetUserFromToken(JwtSecurityToken token);
+		ELoginType GetLoginTypeFromToken(JwtSecurityToken token);
 	}
 }
