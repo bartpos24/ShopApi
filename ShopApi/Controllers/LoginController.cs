@@ -91,7 +91,7 @@ namespace ShopApi.Controllers
 				});
 			} else
 			{
-				//exisitingToken.Guid = Guid.Parse(tokenResponse.AccessToken);
+				exisitingToken.Guid = Guid.Parse(tokenResponse.Id);
 				exisitingToken.ExpirationDate = authService.GetTokenExpiry();
 			}
 			await TokenContext.SaveChangesAsync();
@@ -111,10 +111,12 @@ namespace ShopApi.Controllers
 			if (!await TokenContext.ShopApiTokens.AnyAsync(validToken => validToken.Guid == Guid.Parse(token.Id)))
 				return BadRequest("Nieprawidłowy token dostępu");
 
-			var user = authService.GetUserFromToken(token);
+			
 			var loginType = authService.GetLoginTypeFromToken(token);
-			if (user == null)
-				return NotFound();
+			if (loginType == null)
+				return BadRequest("Nie rozpoznano typu logowania");
+
+			var user = authService.GetUserFromToken(token);
 			var roles = user.RoleForUsers
 				.Select(ru => ru.UserRole.Code)
 				.ToList();
@@ -133,7 +135,7 @@ namespace ShopApi.Controllers
 			{
 				Guid = Guid.Parse(newToken.Id),
 				Username = user.Username,
-				LoginType = oldToken.LoginType,
+				LoginType = loginType,
 				SSAID = SSAID ?? oldToken.SSAID,
 				ExpirationDate = authService.GetTokenExpiry(),
 				Roles = string.Join(",", roles),
