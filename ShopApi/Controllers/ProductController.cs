@@ -154,7 +154,7 @@ namespace ShopApi.Controllers
 		[HttpPost]
 		[Route("[action]")]
 		[Authorize(Roles = "ADM,USR")]
-		public async Task<ActionResult> AddProduct([FromBody] Product product)
+		public async Task<ActionResult<int>> AddProduct([FromBody] Product product)
 		{
 			if (!product.IsGeneral)
 			{
@@ -170,7 +170,7 @@ namespace ShopApi.Controllers
 		[HttpGet]
 		[Route("[action]")]
 		[Authorize(Roles = "ADM,USR")]
-		public async Task<ActionResult> GetAllProducts()
+		public async Task<ActionResult<List<Product>>> GetAllProducts()
 		{
 			var allProducts = await Context.Products.ToListAsync();
 			return allProducts.IsNullOrEmpty() ? NotFound("Nie znaleziono produktów") : Ok(allProducts);
@@ -178,7 +178,7 @@ namespace ShopApi.Controllers
 		[HttpGet]
 		[Route("[action]")]
 		[Authorize(Roles = "ADM,USR")]
-		public async Task<ActionResult> GetAllProductsTestOpenApiGenerate()
+		public async Task<ActionResult<List<Product>>> GetAllProductsTestOpenApiGenerate()
 		{
 			var allProducts = await Context.Products.ToListAsync();
 			return allProducts.IsNullOrEmpty() ? NotFound("Nie znaleziono produktów") : Ok(allProducts);
