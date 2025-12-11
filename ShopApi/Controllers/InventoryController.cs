@@ -39,7 +39,17 @@ namespace ShopApi.Controllers
 		[Authorize(Roles = "ADM,USR")]
         public async Task<ActionResult<int>> CreateInventory([FromBody] Inventory inventory)
         {
-            await Context.Inventories.AddAsync(inventory);
+            int id = HttpContext.GetShopUserId();
+			inventory.CreatedAt = DateTime.Now;
+            inventory.CreatedByUserId = id;
+            inventory.StartDate = DateTime.Now;
+            var status = await Context.InventoryStatus.FirstOrDefaultAsync(s => s.Code == "ACT");
+			if (status is null)
+			{
+				NotFound("Nie znaleziono statusu inwentaryzacji");
+			}
+			inventory.InventoryStatusId = status!.Id;
+			await Context.Inventories.AddAsync(inventory);
             await Context.SaveChangesAsync();
             return Ok(inventory.Id);
 		}
