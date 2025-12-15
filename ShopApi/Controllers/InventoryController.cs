@@ -21,7 +21,7 @@ namespace ShopApi.Controllers
         [Authorize(Roles = "ADM,USR")]
         public async Task<ActionResult<List<Inventory>>> GetAllInventories()
         {
-            var inventories = await Context.Inventories.ToListAsync();
+            var inventories = await Context.Inventories.Include(i => i.CreatedByUser).Include(w => w.InventoryStatus).ToListAsync();
             return Ok(inventories);
         }
 

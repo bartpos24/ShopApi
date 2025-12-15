@@ -18,7 +18,7 @@
         public int CreatedByUserId { get; set; }
         public int InventoryStatusId { get; set; }
 
-        public virtual User CreatedByUser { get; set; }
-        public virtual InventoryStatus InventoryStatus { get; set; }
+        public virtual User? CreatedByUser { get; set; }
+        public virtual InventoryStatus? InventoryStatus { get; set; }
     }
 }

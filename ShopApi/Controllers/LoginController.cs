@@ -51,8 +51,8 @@ namespace ShopApi.Controllers
 				.FirstOrDefaultAsync(u => u.Username == loginModel.Username);
 
 			if (user == null)
-				return NotFound($"Użytkownik o nazwie {loginModel.Username} nie istnieje");
-			if (!authService.VerifyPassword(user, loginModel.Password))
+                return Unauthorized("Nieprawidłowy login lub hasło");
+            if (!authService.VerifyPassword(user, loginModel.Password))
 				return Unauthorized("Nieprawidłowy login lub hasło");
 
 			var roles = user.RoleForUsers
