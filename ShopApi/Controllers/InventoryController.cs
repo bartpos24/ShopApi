@@ -59,17 +59,90 @@ namespace ShopApi.Controllers
 		[Authorize(Roles = "ADM,USR")]
 		public async Task<ActionResult<int>> AddInventoryPosition([FromBody] InventoryPosition inventoryPosition)
 		{
-            if(inventoryPosition.InventoryId == 0)
+            int id = HttpContext.GetShopUserId();
+            if (inventoryPosition.InventoryId == 0)
                 return BadRequest("Nie wybrano inwentaryzacji.");
             if(inventoryPosition.ProductId == 0)
                 return BadRequest("Nie wybrano produktu.");
 
-			await Context.InventoryPositions.AddAsync(inventoryPosition);
+            inventoryPosition.UserId = id;
+
+            await Context.InventoryPositions.AddAsync(inventoryPosition);
 			await Context.SaveChangesAsync();
 			return Ok(inventoryPosition.Id);
 		}
 
-		[HttpGet]
+        [HttpPost]
+        [Route("[action]")]
+        [Authorize(Roles = "ADM,USR")]
+        public async Task<ActionResult<int>> AddCommonInventoryPosition([FromBody] CommonInventoryPosition commonInventoryPosition)
+        {
+            int id = HttpContext.GetShopUserId();
+            if (commonInventoryPosition.InventoryId == 0)
+                return BadRequest("Nie wybrano inwentaryzacji.");
+            if (string.IsNullOrEmpty(commonInventoryPosition.ProductName) || commonInventoryPosition.UnitId == 0 || commonInventoryPosition.Price < 0.0 || commonInventoryPosition.Quantity < 0.0)
+                return BadRequest("Dodawana pozycja zawiera niuzupełnione dane");
+
+            commonInventoryPosition.UserId = id;
+
+            await Context.CommonInventoryPositions.AddAsync(commonInventoryPosition);
+            await Context.SaveChangesAsync();
+            return Ok(commonInventoryPosition.Id);
+        }
+
+        [HttpPost]
+        [Route("[action]")]
+        [Authorize(Roles = "ADM,USR")]
+        public async Task<ActionResult<int>> EditInventoryPosition([FromBody] InventoryPosition inventoryPosition)
+        {
+            int id = HttpContext.GetShopUserId();
+            if (inventoryPosition.InventoryId == 0)
+                return BadRequest("Nie wybrano inwentaryzacji.");
+            if (inventoryPosition.ProductId == 0)
+                return BadRequest("Nie wybrano produktu.");
+
+            var searchingPosition = await Context.InventoryPositions.FirstOrDefaultAsync(ip => ip.Id == inventoryPosition.Id && ip.ProductId == inventoryPosition.ProductId);
+
+            if(searchingPosition == null)
+                return NotFound("Nie znaleziono pozycji inwentaryzacji do edycji.");
+            else
+            {
+                searchingPosition.Quantity = inventoryPosition.Quantity;
+                searchingPosition.Price = inventoryPosition.Price;
+                searchingPosition.ModifiedByUserId = id;
+                Context.InventoryPositions.Update(searchingPosition);
+                await Context.SaveChangesAsync();
+                return Ok(searchingPosition.Id);
+            }
+        }
+
+        [HttpPost]
+        [Route("[action]")]
+        [Authorize(Roles = "ADM,USR")]
+        public async Task<ActionResult<int>> EditCommonInventoryPosition([FromBody] CommonInventoryPosition commonInventoryPosition)
+        {
+            int id = HttpContext.GetShopUserId();
+            if (commonInventoryPosition.InventoryId == 0)
+                return BadRequest("Nie wybrano inwentaryzacji.");
+            if (string.IsNullOrEmpty(commonInventoryPosition.ProductName) || commonInventoryPosition.UnitId == 0 || commonInventoryPosition.Price < 0.0 || commonInventoryPosition.Quantity < 0.0)
+                return BadRequest("Dodawana pozycja zawiera niuzupełnione dane");
+
+            var searchingPosition = await Context.CommonInventoryPositions.FirstOrDefaultAsync(ip => ip.Id == commonInventoryPosition.Id && ip.ProductName == commonInventoryPosition.ProductName);
+
+            if(searchingPosition == null)
+                return NotFound("Nie znaleziono pozycji inwentaryzacji do edycji.");
+            else
+            {
+                searchingPosition.Quantity = commonInventoryPosition.Quantity;
+                searchingPosition.Price = commonInventoryPosition.Price;
+                searchingPosition.ModifiedByUserId = id;
+                Context.CommonInventoryPositions.Update(searchingPosition);
+                await Context.SaveChangesAsync();
+                return Ok(searchingPosition.Id);
+            }
+        }
+
+        [HttpGet]
 		[Route("[action]")]
 		[Authorize(Roles = "ADM,USR")]
 		public async Task<ActionResult<List<Inventory>>> GetAllInventoryPositions([FromQuery] int inventoryId)

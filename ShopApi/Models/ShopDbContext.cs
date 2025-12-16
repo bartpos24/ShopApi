@@ -20,6 +20,7 @@ namespace ShopApi.Models
 		public DbSet<InventoryStatus> InventoryStatus { get; set; }
 		public DbSet<Inventory> Inventories { get; set; }
         public DbSet<InventoryPosition> InventoryPositions { get; set; }
+        public DbSet<CommonInventoryPosition> CommonInventoryPositions { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -55,6 +56,24 @@ namespace ShopApi.Models
                 .WithMany()
                 .HasForeignKey(i => i.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict); // Change from Cascade to Restrict
+
+            builder.Entity<CommonInventoryPosition>()
+                .HasOne(ip => ip.User)
+                .WithMany()
+                .HasForeignKey(ip => ip.UserId)
+                .OnDelete(DeleteBehavior.Restrict); // Change from Cascade to Restrict
+
+            builder.Entity<CommonInventoryPosition>()
+                .HasOne(ip => ip.ModifiedByUser)
+                .WithMany()
+                .HasForeignKey(ip => ip.ModifiedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<CommonInventoryPosition>()
+                .HasOne(ip => ip.Unit)
+                .WithMany()
+                .HasForeignKey(ip => ip.UnitId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
 	}
 }
