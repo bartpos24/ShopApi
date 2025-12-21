@@ -10,7 +10,7 @@
         public bool IsGeneral { get; set; }
 
         public int UnitId { get; set; }
-        public virtual Unit? Unit { get; set; }
+        public virtual ProductUnit? Unit { get; set; }
         public virtual ICollection<Barcode>? Barcodes { get; set; }
 
     }

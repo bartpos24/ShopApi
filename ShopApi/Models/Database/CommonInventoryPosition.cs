@@ -12,7 +12,7 @@
         public int? ModifiedByUserId { get; set; }
         public int UnitId { get; set; }
 
-        public virtual Unit? Unit { get; set; }
+        public virtual ProductUnit? Unit { get; set; }
         public virtual User? User { get; set; }
         public virtual User? ModifiedByUser { get; set; }
         public virtual Inventory? Inventory { get; set; }

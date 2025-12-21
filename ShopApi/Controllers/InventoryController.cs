@@ -88,9 +88,13 @@ namespace ShopApi.Controllers
                 return BadRequest("Dodawana pozycja zawiera niuzupełnione dane");
 
             commonInventoryPosition.UserId = id;
+            var unit = commonInventoryPosition.Unit;
+            commonInventoryPosition.Unit = null;
 
             await Context.CommonInventoryPositions.AddAsync(commonInventoryPosition);
             await Context.SaveChangesAsync();
+
+            commonInventoryPosition.Unit = unit;
             return Ok(commonInventoryPosition);
         }
 

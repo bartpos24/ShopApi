@@ -187,7 +187,7 @@ namespace ShopApi.Controllers
         [HttpGet]
         [Route("[action]")]
         [Authorize(Roles = "ADM,USR")]
-		public async Task<ActionResult<List<Unit>>> GetAllUnits()
+		public async Task<ActionResult<List<ProductUnit>>> GetAllUnits()
 		{
 			var allUnits = await Context.Units.ToListAsync();
 			return allUnits.IsNullOrEmpty() ? NotFound("Nie znaleziono listy jednostek") : Ok(allUnits);
