@@ -57,7 +57,7 @@ namespace ShopApi.Controllers
 		[HttpPost]
 		[Route("[action]")]
 		[Authorize(Roles = "ADM,USR")]
-		public async Task<ActionResult<int>> AddInventoryPosition([FromBody] InventoryPosition inventoryPosition)
+		public async Task<ActionResult<InventoryPosition>> AddInventoryPosition([FromBody] InventoryPosition inventoryPosition)
 		{
             int id = HttpContext.GetShopUserId();
             if (inventoryPosition.InventoryId == 0)
@@ -66,16 +66,20 @@ namespace ShopApi.Controllers
                 return BadRequest("Nie wybrano produktu.");
 
             inventoryPosition.UserId = id;
+            var product = inventoryPosition.Product;
+            inventoryPosition.Product = null;
 
             await Context.InventoryPositions.AddAsync(inventoryPosition);
-			await Context.SaveChangesAsync();
-			return Ok(inventoryPosition.Id);
+            await Context.SaveChangesAsync();
+
+            inventoryPosition.Product = product;
+            return Ok(inventoryPosition);
 		}
 
         [HttpPost]
         [Route("[action]")]
         [Authorize(Roles = "ADM,USR")]
-        public async Task<ActionResult<int>> AddCommonInventoryPosition([FromBody] CommonInventoryPosition commonInventoryPosition)
+        public async Task<ActionResult<CommonInventoryPosition>> AddCommonInventoryPosition([FromBody] CommonInventoryPosition commonInventoryPosition)
         {
             int id = HttpContext.GetShopUserId();
             if (commonInventoryPosition.InventoryId == 0)
@@ -87,13 +91,13 @@ namespace ShopApi.Controllers
 
             await Context.CommonInventoryPositions.AddAsync(commonInventoryPosition);
             await Context.SaveChangesAsync();
-            return Ok(commonInventoryPosition.Id);
+            return Ok(commonInventoryPosition);
         }
 
         [HttpPost]
         [Route("[action]")]
         [Authorize(Roles = "ADM,USR")]
-        public async Task<ActionResult<int>> EditInventoryPosition([FromBody] InventoryPosition inventoryPosition)
+        public async Task<ActionResult<InventoryPosition>> EditInventoryPosition([FromBody] InventoryPosition inventoryPosition)
         {
             int id = HttpContext.GetShopUserId();
             if (inventoryPosition.InventoryId == 0)
@@ -101,7 +105,7 @@ namespace ShopApi.Controllers
             if (inventoryPosition.ProductId == 0)
                 return BadRequest("Nie wybrano produktu.");
 
-            var searchingPosition = await Context.InventoryPositions.FirstOrDefaultAsync(ip => ip.Id == inventoryPosition.Id && ip.ProductId == inventoryPosition.ProductId);
+            var searchingPosition = await Context.InventoryPositions.FirstOrDefaultAsync(ip => ip.Id == inventoryPosition.Id);
 
             if(searchingPosition == null)
                 return NotFound("Nie znaleziono pozycji inwentaryzacji do edycji.");
@@ -112,22 +116,22 @@ namespace ShopApi.Controllers
                 searchingPosition.ModifiedByUserId = id;
                 Context.InventoryPositions.Update(searchingPosition);
                 await Context.SaveChangesAsync();
-                return Ok(searchingPosition.Id);
+                return Ok(searchingPosition);
             }
         }
 
         [HttpPost]
         [Route("[action]")]
         [Authorize(Roles = "ADM,USR")]
-        public async Task<ActionResult<int>> EditCommonInventoryPosition([FromBody] CommonInventoryPosition commonInventoryPosition)
+        public async Task<ActionResult<CommonInventoryPosition>> EditCommonInventoryPosition([FromBody] CommonInventoryPosition commonInventoryPosition)
         {
             int id = HttpContext.GetShopUserId();
             if (commonInventoryPosition.InventoryId == 0)
                 return BadRequest("Nie wybrano inwentaryzacji.");
             if (string.IsNullOrEmpty(commonInventoryPosition.ProductName) || commonInventoryPosition.UnitId == 0 || commonInventoryPosition.Price < 0.0 || commonInventoryPosition.Quantity < 0.0)
-                return BadRequest("Dodawana pozycja zawiera niuzupełnione dane");
+                return BadRequest("Edytowana pozycja zawiera niuzupełnione dane");
 
-            var searchingPosition = await Context.CommonInventoryPositions.FirstOrDefaultAsync(ip => ip.Id == commonInventoryPosition.Id && ip.ProductName == commonInventoryPosition.ProductName);
+            var searchingPosition = await Context.CommonInventoryPositions.FirstOrDefaultAsync(ip => ip.Id == commonInventoryPosition.Id);
 
             if(searchingPosition == null)
                 return NotFound("Nie znaleziono pozycji inwentaryzacji do edycji.");
@@ -138,28 +142,54 @@ namespace ShopApi.Controllers
                 searchingPosition.ModifiedByUserId = id;
                 Context.CommonInventoryPositions.Update(searchingPosition);
                 await Context.SaveChangesAsync();
-                return Ok(searchingPosition.Id);
+                return Ok(searchingPosition);
             }
         }
 
         [HttpGet]
 		[Route("[action]")]
 		[Authorize(Roles = "ADM,USR")]
-		public async Task<ActionResult<List<Inventory>>> GetAllInventoryPositions([FromQuery] int inventoryId)
+		public async Task<ActionResult<List<InventoryPosition>>> GetAllInventoryPositions([FromQuery] int inventoryId)
 		{
-			var inventoryPositions = await Context.InventoryPositions.Where(w => w.InventoryId == inventoryId).ToListAsync();
-			return inventoryPositions.IsNullOrEmpty() ? NotFound("Nie znaleziono pozycji dla wybranej inwentaryzacji") : Ok(inventoryPositions);
+			var inventoryPositions = await Context.InventoryPositions.Where(w => w.InventoryId == inventoryId)
+                .Include(w => w.Product).ThenInclude(w => w.Unit)
+                .Include(w => w.Product).ThenInclude(w => w.Barcodes)
+                .ToListAsync();
+            return inventoryPositions.IsNullOrEmpty() ? NotFound("Nie znaleziono listy pozycji dla wybranej inwentaryzacji") : Ok(inventoryPositions);
 		}
 
 		[HttpGet]
 		[Route("[action]")]
 		[Authorize(Roles = "ADM,USR")]
-		public async Task<ActionResult<List<Inventory>>> GetAllInventoryPositionsForUser([FromQuery] int inventoryId, [FromQuery] int? userId = null)
+		public async Task<ActionResult<List<InventoryPosition>>> GetAllInventoryPositionsForUser([FromQuery] int inventoryId, [FromQuery] int? userId = null)
 		{
             if(userId == null)
                 userId = HttpContext.GetShopUserId();
-			var inventoryPositions = await Context.InventoryPositions.Where(w => w.InventoryId == inventoryId && w.UserId == userId).ToListAsync();
-			return inventoryPositions.IsNullOrEmpty() ? NotFound("Nie znaleziono pozycji dla wybranej inwentaryzacji") : Ok(inventoryPositions);
+			var inventoryPositions = await Context.InventoryPositions.Where(w => w.InventoryId == inventoryId && w.UserId == userId)
+                .Include(w => w.Product).ThenInclude(w => w.Unit)
+                .Include(w => w.Product).ThenInclude(w => w.Barcodes)
+                .ToListAsync();
+			return inventoryPositions.IsNullOrEmpty() ? NotFound("Nie znaleziono listy pozycji dla wybranej inwentaryzacji") : Ok(inventoryPositions);
 		}
-	}
+
+        [HttpGet]
+        [Route("[action]")]
+        [Authorize(Roles = "ADM,USR")]
+        public async Task<ActionResult<List<CommonInventoryPosition>>> GetAllCommonInventoryPositions([FromQuery] int inventoryId)
+        {
+            var inventoryPositions = await Context.CommonInventoryPositions.Where(w => w.InventoryId == inventoryId).Include(w => w.Unit).ToListAsync();
+            return inventoryPositions.IsNullOrEmpty() ? NotFound("Nie znaleziono listy pozycji dla wybranej inwentaryzacji") : Ok(inventoryPositions);
+        }
+
+        [HttpGet]
+        [Route("[action]")]
+        [Authorize(Roles = "ADM,USR")]
+        public async Task<ActionResult<List<CommonInventoryPosition>>> GetAllCommonInventoryPositionsForUser([FromQuery] int inventoryId, [FromQuery] int? userId = null)
+        {
+            if (userId == null)
+                userId = HttpContext.GetShopUserId();
+            var inventoryPositions = await Context.CommonInventoryPositions.Where(w => w.InventoryId == inventoryId && w.UserId == userId).Include(w => w.Unit).ToListAsync();
+            return inventoryPositions.IsNullOrEmpty() ? NotFound("Nie znaleziono listy pozycji dla wybranej inwentaryzacji") : Ok(inventoryPositions);
+        }
+    }
 }

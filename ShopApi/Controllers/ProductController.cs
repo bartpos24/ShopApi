@@ -183,5 +183,14 @@ namespace ShopApi.Controllers
 			var allProducts = await Context.Products.ToListAsync();
 			return allProducts.IsNullOrEmpty() ? NotFound("Nie znaleziono produktów") : Ok(allProducts);
 		}
-	}
+
+        [HttpGet]
+        [Route("[action]")]
+        [Authorize(Roles = "ADM,USR")]
+		public async Task<ActionResult<List<Unit>>> GetAllUnits()
+		{
+			var allUnits = await Context.Units.ToListAsync();
+			return allUnits.IsNullOrEmpty() ? NotFound("Nie znaleziono listy jednostek") : Ok(allUnits);
+        }
+    }
 }
