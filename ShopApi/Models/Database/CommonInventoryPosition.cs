@@ -11,6 +11,8 @@
         public int InventoryId { get; set; }
         public int? ModifiedByUserId { get; set; }
         public int UnitId { get; set; }
+        public int? IsDeleted { get; set; }
+        public DateTime? ModificationDate { get; set; }
 
         public virtual ProductUnit? Unit { get; set; }
         public virtual User? User { get; set; }

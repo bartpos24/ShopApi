@@ -10,6 +10,8 @@
 		public int UserId { get; set; }
         public int InventoryId { get; set; }
 		public int? ModifiedByUserId { get; set; }
+        public int? IsDeleted { get; set; }
+        public DateTime? ModificationDate { get; set; }
 
         public virtual Product? Product { get; set; }
 		public virtual User? User { get; set; }
