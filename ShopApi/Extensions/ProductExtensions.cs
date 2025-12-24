@@ -14,7 +14,7 @@ namespace ShopApi.Extensions
             string result;
 
             // Step 1: Handle Brand and Name
-            if (!string.IsNullOrEmpty(product.Name) && !string.IsNullOrEmpty(product.Brand) && product.Name.Contains(product.Brand))
+            if (!string.IsNullOrEmpty(product.Name) && !string.IsNullOrEmpty(product.Brand) && product.Name.Contains(product.Brand, StringComparison.OrdinalIgnoreCase))
                 result = product.Name;
             else if (!string.IsNullOrEmpty(product.Brand) && !string.IsNullOrEmpty(product.Name))
                 result = $"{product.Brand} {product.Name}";
