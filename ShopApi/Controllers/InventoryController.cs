@@ -32,7 +32,7 @@ namespace ShopApi.Controllers
         [Authorize(Roles = "ADM,USR")]
         public async Task<ActionResult<Inventory>> GetInventoryById([FromQuery] int inventoryId)
         {
-            var inventory = await Context.Inventories.FirstOrDefaultAsync(i => i.Id == inventoryId);
+            var inventory = await Context.Inventories.Include(i => i.CreatedByUser).Include(i => i.InventoryStatus).FirstOrDefaultAsync(i => i.Id == inventoryId);
             return inventory != null ? Ok(inventory) : NotFound("Nie znaleziono inwentaryzacji o podanym ID");
         }
 
@@ -89,6 +89,7 @@ namespace ShopApi.Controllers
             if (string.IsNullOrEmpty(commonInventoryPosition.ProductName) || commonInventoryPosition.UnitId == 0 || commonInventoryPosition.Price < 0.0 || commonInventoryPosition.Quantity < 0.0)
                 return BadRequest("Dodawana pozycja zawiera niuzupełnione dane");
 
+            commonInventoryPosition.ModifiedByUserId = null;
             commonInventoryPosition.UserId = id;
             var unit = commonInventoryPosition.Unit;
             commonInventoryPosition.Unit = null;
@@ -96,7 +97,10 @@ namespace ShopApi.Controllers
             await Context.CommonInventoryPositions.AddAsync(commonInventoryPosition);
             await Context.SaveChangesAsync();
 
-            commonInventoryPosition.Unit = unit;
+            if(unit == null)
+                commonInventoryPosition.Unit = await Context.Units.FirstOrDefaultAsync(u => u.Id == commonInventoryPosition.UnitId);
+            else
+                commonInventoryPosition.Unit = unit;
             return Ok(commonInventoryPosition);
         }
 
@@ -143,14 +147,17 @@ namespace ShopApi.Controllers
 
             var searchingPosition = await Context.CommonInventoryPositions.FirstOrDefaultAsync(ip => ip.Id == commonInventoryPosition.Id);
 
+            if (commonInventoryPosition.Unit == null)
+                commonInventoryPosition.Unit = await Context.Units.FirstOrDefaultAsync(u => u.Id == commonInventoryPosition.UnitId);
+
             if (searchingPosition == null)
                 return NotFound("Nie znaleziono pozycji inwentaryzacji do edycji.");
             else
             {
                 var unit = commonInventoryPosition.Unit;
-                searchingPosition.Unit = null;
                 searchingPosition.Quantity = commonInventoryPosition.Quantity;
                 searchingPosition.Price = commonInventoryPosition.Price;
+                searchingPosition.UnitId = commonInventoryPosition.UnitId;
                 searchingPosition.ModifiedByUserId = id;
                 searchingPosition.ModificationDate = DateTime.Now;
                 Context.CommonInventoryPositions.Update(searchingPosition);
