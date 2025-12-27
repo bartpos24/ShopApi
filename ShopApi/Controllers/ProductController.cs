@@ -167,7 +167,40 @@ namespace ShopApi.Controllers
 			await Context.SaveChangesAsync();
 			return Ok(product.Id);
 		}
-		[HttpGet]
+        [HttpPost]
+        [Route("[action]")]
+        [Authorize(Roles = "ADM,USR")]
+        public async Task<ActionResult<int>> AddEditProduct([FromBody] Product product, [FromQuery] string barcode)
+        {
+			if(product.Id > 0)
+			{
+				var productToEdit = await Context.Products.FirstOrDefaultAsync(w => w.Id == product.Id);
+				if (productToEdit == null)
+					return NotFound("Nie znaleziono produktu do edycji");
+				productToEdit.Brand = product.Brand;
+				productToEdit.Name = product.Name;
+				productToEdit.Capacity = product.Capacity;
+				productToEdit.UnitId = product.UnitId;
+				var result = Context.Products.Update(productToEdit);
+				await Context.SaveChangesAsync();
+				return Ok(productToEdit.Id);
+			} else
+			{
+				if (string.IsNullOrEmpty(barcode))
+					return NotFound("Nie podano kodu kreskowego produktu");
+				await Context.Products.AddAsync(product);
+                await Context.SaveChangesAsync();
+                var productBarcode = new Barcode
+                {
+                    Code = barcode,
+                    ProductId = product.Id
+                };
+                await Context.Barcodes.AddAsync(productBarcode);
+                await Context.SaveChangesAsync();
+				return Ok(product.Id);
+            }
+        }
+        [HttpGet]
 		[Route("[action]")]
 		[Authorize(Roles = "ADM,USR")]
 		public async Task<ActionResult<List<Product>>> GetAllProducts()

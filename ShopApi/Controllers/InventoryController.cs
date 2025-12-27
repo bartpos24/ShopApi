@@ -283,7 +283,7 @@ namespace ShopApi.Controllers
                     Product = g.First().Product,
                     LatestDate = g.Max(x => x.ModificationDate ?? x.ScanDate)
                 }).ToListAsync();
-            var commonInventoryPositions = await Context.CommonInventoryPositions.Where(w => w.InventoryId == inventoryId && w.IsDeleted != 1).ToListAsync();
+            var commonInventoryPositions = await Context.CommonInventoryPositions.Where(w => w.InventoryId == inventoryId && w.IsDeleted != 1).Include(w => w.Unit).ToListAsync();
 
             List<SummaryInventoryPosition> summaryInventoryPositions = new List<SummaryInventoryPosition>();
             foreach (var inventoryPosition in inventoryPositions)
