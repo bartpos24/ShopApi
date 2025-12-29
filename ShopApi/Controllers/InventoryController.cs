@@ -23,7 +23,7 @@ namespace ShopApi.Controllers
         [Authorize(Roles = "ADM,USR")]
         public async Task<ActionResult<List<Inventory>>> GetAllInventories()
         {
-            var inventories = await Context.Inventories.Include(i => i.CreatedByUser).Include(w => w.InventoryStatus).ToListAsync();
+            var inventories = await Context.Inventories.Include(i => i.CreatedByUser).Include(w => w.InventoryStatus).Where(w => w.InventoryStatus.Code != "FIN").OrderByDescending(w => w.CreatedAt).ToListAsync();
             return Ok(inventories);
         }
 

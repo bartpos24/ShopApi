@@ -121,32 +121,58 @@ namespace ShopApi.Controllers
 			var listOfProduct = await Context.Products.Where(p => productIds.Contains(p.Id)).Include(u => u.Unit).Include(b => b.Barcodes).ToListAsync();
 			if (listOfProduct.IsNullOrEmpty())
 			{
-				var product = await Context.InitProducts.FirstOrDefaultAsync(ip => ip.Barcode == barcode);
-				if (product == null)
-					return NotFound("Nie znaleziono produktu z podanym kodem");
-				else
+				var productFromOpenFoodFact = await openFoodFactsService.GetProductByBarcodeAsync(barcode);
+				if(productFromOpenFoodFact == null)
 				{
-					var productToAdd = new Product()
-					{
-						Name = product.Name,
-						Brand = product.Brand,
-						Label = product.Label,
-						Capacity = product.Capacity,
-						IsGeneral = false,
-						UnitId = Context.Units.FirstOrDefault(w => w.Code == "szt").Id
-					};
-					await Context.Products.AddAsync(productToAdd);
-					await Context.SaveChangesAsync();
-					var productBarcode = new Barcode
-					{
-						Code = product.Barcode,
-						ProductId = productToAdd.Id
-					};
-					await Context.Barcodes.AddAsync(productBarcode);
-					await Context.SaveChangesAsync();
-					listOfProduct.Add(await Context.Products.Include(u => u.Unit).Include(b => b.Barcodes).FirstOrDefaultAsync(w => w.Id == productToAdd.Id));
-					return listOfProduct.IsNullOrEmpty() ? NotFound("Nie znaleziono produktu z podanym kodem") : Ok(listOfProduct);
-				}
+                    var product = await Context.InitProducts.FirstOrDefaultAsync(ip => ip.Barcode == barcode);
+                    if (product == null)
+                        return NotFound("Nie znaleziono produktu z podanym kodem");
+                    else
+                    {
+                        var productToAdd = new Product()
+                        {
+                            Name = product.Name,
+                            Brand = product.Brand,
+                            Label = product.Label,
+                            Capacity = product.Capacity,
+                            IsGeneral = false,
+                            UnitId = Context.Units.FirstOrDefault(w => w.Code == "szt").Id
+                        };
+                        await Context.Products.AddAsync(productToAdd);
+                        await Context.SaveChangesAsync();
+                        var productBarcode = new Barcode
+                        {
+                            Code = product.Barcode,
+                            ProductId = productToAdd.Id
+                        };
+                        await Context.Barcodes.AddAsync(productBarcode);
+                        await Context.SaveChangesAsync();
+                        listOfProduct.Add(await Context.Products.Include(u => u.Unit).Include(b => b.Barcodes).FirstOrDefaultAsync(w => w.Id == productToAdd.Id));
+                        return listOfProduct.IsNullOrEmpty() ? NotFound("Nie znaleziono produktu z podanym kodem") : Ok(listOfProduct);
+                    }
+                } else
+				{
+                    var productToAdd = new Product()
+                    {
+                        Name = productFromOpenFoodFact.Name,
+                        Brand = productFromOpenFoodFact.Brand,
+                        Label = productFromOpenFoodFact.Label,
+                        Capacity = productFromOpenFoodFact.Capacity,
+                        IsGeneral = false,
+                        UnitId = Context.Units.FirstOrDefault(w => w.Code == "szt").Id
+                    };
+                    await Context.Products.AddAsync(productToAdd);
+                    await Context.SaveChangesAsync();
+                    var productBarcode = new Barcode
+                    {
+                        Code = barcode,
+                        ProductId = productToAdd.Id
+                    };
+                    await Context.Barcodes.AddAsync(productBarcode);
+                    await Context.SaveChangesAsync();
+                    listOfProduct.Add(await Context.Products.Include(u => u.Unit).Include(b => b.Barcodes).FirstOrDefaultAsync(w => w.Id == productToAdd.Id));
+                    return listOfProduct.IsNullOrEmpty() ? NotFound("Nie znaleziono produktu z podanym kodem") : Ok(listOfProduct);
+                }
 			}
 			else
 				return Ok(listOfProduct);
