@@ -155,6 +155,7 @@ namespace ShopApi.Controllers
             else
             {
                 var unit = commonInventoryPosition.Unit;
+                searchingPosition.ProductName = commonInventoryPosition.ProductName;
                 searchingPosition.Quantity = commonInventoryPosition.Quantity;
                 searchingPosition.Price = commonInventoryPosition.Price;
                 searchingPosition.UnitId = commonInventoryPosition.UnitId;
