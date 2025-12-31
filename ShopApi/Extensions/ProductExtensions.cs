@@ -52,8 +52,9 @@ namespace ShopApi.Extensions
             }
 
             // Check if the number appears after a whitespace in the result (e.g., "Coca-cola 850" or "Muszynianka 1,5")
-            // Match the number with either comma or dot, surrounded by word boundaries or whitespace
-            string pattern = @"\s+" + Regex.Escape(capacityNumber).Replace(@"\.", @"[.,]").Replace(@"\,", @"[.,]");
+            // Match the number with either comma or dot, followed by whitespace or end of string (not followed by %)
+            // This prevents matching "1" in "100%"
+            string pattern = @"\s+" + Regex.Escape(capacityNumber).Replace(@"\.", @"[.,]").Replace(@"\,", @"[.,]") + @"(?!\d|%)";
             var nameNumberMatch = Regex.Match(result, pattern);
 
             if (nameNumberMatch.Success)
